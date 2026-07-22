@@ -15,16 +15,12 @@ function fixCanvas() {
   let data;
   try {
     data = JSON.parse(content);
-    // If valid, just format it
     fs.writeFileSync(CANVAS_FILE, JSON.stringify(data, null, 2));
     console.log('JSON is already valid, formatted successfully.');
     return;
   } catch (err) {
     console.log(`JSON parse failed (${err.message}). Attempting regex extraction...`);
   }
-
-  // Attempt to recover by extracting all "song", "artist", "url" sets.
-  // First, find anything that looks like an object.
   const itemRegex = /\{[^{}]*\}/g;
   const items = [];
   let match;
@@ -37,16 +33,17 @@ function fixCanvas() {
     const urlMatch = /"url"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/.exec(block);
 
     if (songMatch && artistMatch && urlMatch) {
-      items.push({
-        song: songMatch[1],
-        artist: artistMatch[1],
-        url: urlMatch[1]
-      });
-      hasExtracted = true;
+      try {
+        items.push({
+          song: JSON.parse('"' + songMatch[1] + '"'),
+          artist: JSON.parse('"' + artistMatch[1] + '"'),
+          url: JSON.parse('"' + urlMatch[1] + '"')
+        });
+        hasExtracted = true;
+      } catch (e) {
+      }
     }
   }
-
-  // If no object blocks found, try sequential extraction
   if (!hasExtracted) {
     console.log('No valid {} blocks found, attempting sequential field extraction...');
     const songRegex = /"song"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
@@ -59,16 +56,15 @@ function fixCanvas() {
 
     const count = Math.min(songs.length, artists.length, urls.length);
     for (let i = 0; i < count; i++) {
-      items.push({
-        song: songs[i],
-        artist: artists[i],
-        url: urls[i]
-      });
+      try {
+        items.push({
+          song: JSON.parse('"' + songs[i] + '"'),
+          artist: JSON.parse('"' + artists[i] + '"'),
+          url: JSON.parse('"' + urls[i] + '"')
+        });
+      } catch (e) {}
     }
   }
-
-  
-  // Deduplicate items
   const uniqueItems = [];
   const seen = new Set();
   for (const item of items) {
@@ -81,9 +77,7 @@ function fixCanvas() {
   items.length = 0;
   items.push(...uniqueItems);
 
-if (items.length > 0) {
-    // We should also check for any lost items that might have been correctly parsed in the baseline
-    // but were mangled by the user. Actually, this regex approach captures everything matching the keys.
+  if (items.length > 0) {
     const newData = { items };
     fs.writeFileSync(CANVAS_FILE, JSON.stringify(newData, null, 2));
     console.log(`Auto-fixed JSON and recovered ${items.length} items.`);

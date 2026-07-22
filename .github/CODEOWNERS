@@ -1,0 +1,2 @@
+# Protect GitHub Actions workflows from unauthorized automated changes
+/.github/workflows/ @EchoMusicApp
